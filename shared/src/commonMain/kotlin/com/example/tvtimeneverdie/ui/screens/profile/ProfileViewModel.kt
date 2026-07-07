@@ -109,7 +109,12 @@ class ProfileViewModel(
             }
 
             _uiState.update {
-                it.copy(isLoadingSeries = false, toWatch = toWatch, watching = watching, completed = completed)
+                it.copy(
+                    isLoadingSeries = false,
+                    toWatch = toWatch.sortedByDescending { show -> show.premiered ?: "" },
+                    watching = watching.sortedByDescending { progress -> progress.show.premiered ?: "" },
+                    completed = completed.sortedByDescending { progress -> progress.show.premiered ?: "" },
+                )
             }
         } catch (e: Exception) {
             _uiState.update {
@@ -123,7 +128,13 @@ class ProfileViewModel(
         try {
             val toWatch = watchlistIds.mapNotNull { id -> runCatching { movieRepository.getMovie(id) }.getOrNull() }
             val watched = watchedIds.mapNotNull { id -> runCatching { movieRepository.getMovie(id) }.getOrNull() }
-            _uiState.update { it.copy(isLoadingMovies = false, toWatchMovies = toWatch, watchedMovies = watched) }
+            _uiState.update {
+                it.copy(
+                    isLoadingMovies = false,
+                    toWatchMovies = toWatch.sortedByDescending { movie -> movie.releaseDate ?: "" },
+                    watchedMovies = watched.sortedByDescending { movie -> movie.releaseDate ?: "" },
+                )
+            }
         } catch (e: Exception) {
             _uiState.update {
                 it.copy(isLoadingMovies = false, moviesErrorMessage = e.message ?: "Errore nel caricamento dei film")

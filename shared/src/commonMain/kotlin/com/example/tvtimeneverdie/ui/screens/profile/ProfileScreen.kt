@@ -89,18 +89,18 @@ fun ProfileScreen(
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             profileGridSection(
-                                title = "Da vedere",
-                                items = state.toWatch,
-                                emptyText = "Nessuna serie in Da vedere",
-                            ) { show -> ShowGridItem(show = show, onClick = { onShowClick(show.id) }) }
-
-                            profileGridSection(
                                 title = "In corso",
                                 items = state.watching,
                                 emptyText = "Nessuna serie in corso",
                             ) { progress ->
                                 ShowProgressGridItem(progress = progress, onClick = { onShowClick(progress.show.id) })
                             }
+
+                            profileGridSection(
+                                title = "Da vedere",
+                                items = state.toWatch,
+                                emptyText = "Nessuna serie in Da vedere",
+                            ) { show -> ShowGridItem(show = show, onClick = { onShowClick(show.id) }) }
 
                             profileGridSection(
                                 title = "Completate",
@@ -120,15 +120,15 @@ fun ProfileScreen(
                         )
                         else -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                             profileSection(
-                                title = "Da vedere",
-                                items = state.toWatchMovies,
-                                emptyText = "Nessun film in Da vedere",
-                            ) { movie -> MovieListRow(movie = movie, onClick = { onMovieClick(movie.id) }) }
-
-                            profileSection(
                                 title = "Viste",
                                 items = state.watchedMovies,
                                 emptyText = "Nessun film visto",
+                            ) { movie -> MovieListRow(movie = movie, onClick = { onMovieClick(movie.id) }) }
+
+                            profileSection(
+                                title = "Da vedere",
+                                items = state.toWatchMovies,
+                                emptyText = "Nessun film in Da vedere",
                             ) { movie -> MovieListRow(movie = movie, onClick = { onMovieClick(movie.id) }) }
                         }
                     }
