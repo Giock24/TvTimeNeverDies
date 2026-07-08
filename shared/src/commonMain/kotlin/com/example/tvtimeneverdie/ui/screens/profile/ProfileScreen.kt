@@ -1,12 +1,15 @@
 package com.example.tvtimeneverdie.ui.screens.profile
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -18,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tvtimeneverdie.ui.components.MediaType
 import com.example.tvtimeneverdie.ui.components.MediaTypeTabRow
 import com.example.tvtimeneverdie.ui.components.MovieListRow
+import com.example.tvtimeneverdie.ui.components.ProfileSearchField
 import com.example.tvtimeneverdie.ui.components.ShowGridItem
 import com.example.tvtimeneverdie.ui.components.ShowProgressGridItem
 import com.example.tvtimeneverdie.ui.rememberViewModel
@@ -52,6 +55,7 @@ fun ProfileScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(MediaType.SERIES) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     if (showImportDialog) {
         GdprImportDialog(uid = uid, onDismiss = { showImportDialog = false })
@@ -68,13 +72,48 @@ fun ProfileScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            OutlinedButton(
-                onClick = { showImportDialog = true },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Carica i tuoi dati di TV Time")
+                TextButton(onClick = { showImportDialog = true }) {
+                    Text("Importa da TV Time", style = MaterialTheme.typography.labelMedium)
+                }
+                ProfileSearchField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    modifier = Modifier.width(140.dp),
+                )
             }
             MediaTypeTabRow(selected = selectedTab, onSelect = { selectedTab = it })
+
+            val filteredWatching = if (searchQuery.isBlank()) {
+                state.watching
+            } else {
+                state.watching.filter { it.show.name.contains(searchQuery, ignoreCase = true) }
+            }
+            val filteredToWatch = if (searchQuery.isBlank()) {
+                state.toWatch
+            } else {
+                state.toWatch.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            }
+            val filteredCompleted = if (searchQuery.isBlank()) {
+                state.completed
+            } else {
+                state.completed.filter { it.show.name.contains(searchQuery, ignoreCase = true) }
+            }
+            val filteredWatchedMovies = if (searchQuery.isBlank()) {
+                state.watchedMovies
+            } else {
+                state.watchedMovies.filter { it.title.contains(searchQuery, ignoreCase = true) }
+            }
+            val filteredToWatchMovies = if (searchQuery.isBlank()) {
+                state.toWatchMovies
+            } else {
+                state.toWatchMovies.filter { it.title.contains(searchQuery, ignoreCase = true) }
+            }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedTab) {
                     MediaType.SERIES -> when {
@@ -91,7 +130,7 @@ fun ProfileScreen(
                         ) {
                             profileGridSection(
                                 title = "In corso",
-                                items = state.watching,
+                                items = filteredWatching,
                                 emptyText = "Nessuna serie in corso",
                             ) { progress ->
                                 ShowProgressGridItem(progress = progress, onClick = { onShowClick(progress.show.id) })
@@ -99,13 +138,13 @@ fun ProfileScreen(
 
                             profileGridSection(
                                 title = "Da vedere",
-                                items = state.toWatch,
+                                items = filteredToWatch,
                                 emptyText = "Nessuna serie in Da vedere",
                             ) { show -> ShowGridItem(show = show, onClick = { onShowClick(show.id) }) }
 
                             profileGridSection(
                                 title = "Completate",
-                                items = state.completed,
+                                items = filteredCompleted,
                                 emptyText = "Nessuna serie completata",
                             ) { progress ->
                                 ShowProgressGridItem(progress = progress, onClick = { onShowClick(progress.show.id) })
@@ -130,13 +169,13 @@ fun ProfileScreen(
                         else -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                             profileSection(
                                 title = "Viste",
-                                items = state.watchedMovies,
+                                items = filteredWatchedMovies,
                                 emptyText = "Nessun film visto",
                             ) { movie -> MovieListRow(movie = movie, onClick = { onMovieClick(movie.id) }) }
 
                             profileSection(
                                 title = "Da vedere",
-                                items = state.toWatchMovies,
+                                items = filteredToWatchMovies,
                                 emptyText = "Nessun film in Da vedere",
                             ) { movie -> MovieListRow(movie = movie, onClick = { onMovieClick(movie.id) }) }
 

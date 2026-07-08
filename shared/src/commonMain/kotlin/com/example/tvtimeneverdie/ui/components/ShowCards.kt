@@ -84,16 +84,14 @@ fun ShowProgressGridItem(progress: ShowProgress, onClick: () -> Unit, modifier: 
                 .height(180.dp)
                 .clip(RoundedCornerShape(8.dp)),
         )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = progress.show.name,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "${progress.watchedEpisodeCount}/${progress.totalEpisodeCount} episodi",
-            style = MaterialTheme.typography.bodySmall,
+        Spacer(Modifier.height(6.dp))
+        EpisodeProgressBar(
+            fraction = if (progress.totalEpisodeCount > 0) {
+                progress.watchedEpisodeCount.toFloat() / progress.totalEpisodeCount.toFloat()
+            } else {
+                0f
+            },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
