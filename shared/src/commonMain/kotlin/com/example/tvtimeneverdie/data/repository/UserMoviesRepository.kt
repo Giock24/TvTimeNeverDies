@@ -54,4 +54,10 @@ class UserMoviesRepository {
         watchedCollection(uid).snapshots.map { snapshot ->
             snapshot.documents.map { it.data<WatchedMovieEntry>().movieId }.toSet()
         }
+
+    /** Tutti i film che l'utente ha segnato come visti, con la data in cui li ha visti. */
+    fun watchedEntries(uid: String): Flow<List<WatchedMovieEntry>> =
+        watchedCollection(uid).snapshots.map { snapshot ->
+            snapshot.documents.map { it.data<WatchedMovieEntry>() }
+        }
 }

@@ -8,6 +8,7 @@ import com.example.tvtimeneverdie.data.repository.TvShowRepository
 import com.example.tvtimeneverdie.data.repository.UserMoviesRepository
 import com.example.tvtimeneverdie.data.repository.UserShowsRepository
 import com.example.tvtimeneverdie.data.repository.WatchedEpisodeEntry
+import com.example.tvtimeneverdie.data.repository.WatchedMovieEntry
 import com.example.tvtimeneverdie.di.AppContainer
 import com.example.tvtimeneverdie.domain.model.Movie
 import com.example.tvtimeneverdie.domain.model.Show
@@ -77,14 +78,14 @@ class ProfileViewModel(
         viewModelScope.launch {
             combine(
                 userMoviesRepository.watchlistIds(uid),
-                userMoviesRepository.watchedIds(uid),
-            ) { watchlistIds, watchedIds -> watchlistIds to watchedIds }
+                userMoviesRepository.watchedEntries(uid),
+            ) { watchlistIds, watchedEntries -> watchlistIds to watchedEntries }
                 .catch { e ->
                     _uiState.update {
                         it.copy(isLoadingMovies = false, moviesErrorMessage = e.message ?: "Errore Firestore")
                     }
                 }
-                .collect { (watchlistIds, watchedIds) -> refreshMovies(watchlistIds, watchedIds) }
+                .collect { (watchlistIds, watchedEntries) -> refreshMovies(watchlistIds, watchedEntries) }
         }
     }
 
@@ -122,12 +123,14 @@ class ProfileViewModel(
                             } else {
                                 ShowWatchStatus.WATCHING
                             }
+                            val lastWatchedAtMillis = watchedByShow[showId]?.maxOfOrNull { it.watchedAtMillis }
                             SeriesFetchResult(
                                 progress = ShowProgress(
                                     show = show,
                                     watchedEpisodeCount = watchedCount,
                                     totalEpisodeCount = totalCount,
                                     status = status,
+                                    lastWatchedAtMillis = lastWatchedAtMillis,
                                 ),
                             )
                         }
@@ -147,7 +150,10 @@ class ProfileViewModel(
                         isLoadingSeries = false,
                         isLoadingMoreSeries = hasMore,
                         toWatch = toWatch.sortedByDescending { show -> show.premiered ?: "" },
-                        watching = watching.sortedByDescending { progress -> progress.show.premiered ?: "" },
+                        watching = watching.sortedWith(
+                            compareByDescending<ShowProgress> { it.lastWatchedAtMillis ?: Long.MIN_VALUE }
+                                .thenByDescending { it.show.premiered ?: "" },
+                        ),
                         completed = completed.sortedByDescending { progress -> progress.show.premiered ?: "" },
                     )
                 }
@@ -163,9 +169,11 @@ class ProfileViewModel(
         }
     }
 
-    private suspend fun refreshMovies(watchlistIds: Set<Int>, watchedIds: Set<Int>) {
+    private suspend fun refreshMovies(watchlistIds: Set<Int>, watchedEntries: List<WatchedMovieEntry>) {
         _uiState.update { it.copy(isLoadingMovies = true, isLoadingMoreMovies = false, moviesErrorMessage = null) }
         try {
+            val watchedAtByMovieId = watchedEntries.associate { it.movieId to it.watchedAtMillis }
+            val watchedIds = watchedAtByMovieId.keys
             val allMovieIds = (watchlistIds + watchedIds).distinct()
             val chunks = allMovieIds.chunked(MOVIES_CHUNK_SIZE)
 
@@ -196,7 +204,7 @@ class ProfileViewModel(
                         isLoadingMovies = false,
                         isLoadingMoreMovies = hasMore,
                         toWatchMovies = toWatch.sortedByDescending { movie -> movie.releaseDate ?: "" },
-                        watchedMovies = watched.sortedByDescending { movie -> movie.releaseDate ?: "" },
+                        watchedMovies = watched.sortedByDescending { movie -> watchedAtByMovieId[movie.id] ?: 0L },
                     )
                 }
             }

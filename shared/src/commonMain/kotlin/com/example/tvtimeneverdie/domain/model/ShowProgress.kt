@@ -11,4 +11,5 @@ data class ShowProgress(
     val watchedEpisodeCount: Int,
     val totalEpisodeCount: Int,
     val status: ShowWatchStatus,
+    val lastWatchedAtMillis: Long? = null,
 )
