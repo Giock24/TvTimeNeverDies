@@ -28,6 +28,7 @@ fun EpisodeDto.toDomain(showId: Int): Episode = Episode(
     number = number,
     name = name,
     airdate = airdate,
+    airtime = airtime,
     imageUrl = image?.original ?: image?.medium,
     summary = summary.stripHtml(),
 )

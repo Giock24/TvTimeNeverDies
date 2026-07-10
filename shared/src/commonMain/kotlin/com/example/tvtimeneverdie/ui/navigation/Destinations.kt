@@ -6,7 +6,10 @@ import kotlinx.serialization.Serializable
 data object LoginDestination
 
 @Serializable
-data object HomeDestination
+data object SerieDestination
+
+@Serializable
+data object FilmDestination
 
 @Serializable
 data object SearchDestination

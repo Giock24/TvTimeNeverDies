@@ -7,6 +7,7 @@ data class Episode(
     val number: Int?,
     val name: String,
     val airdate: String?,
+    val airtime: String? = null,
     val imageUrl: String?,
     val summary: String,
 )
