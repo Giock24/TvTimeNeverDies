@@ -30,4 +30,9 @@ class MovieRepository(
             mutex.withLock { movies.forEach { movieCache[it.id] = it } }
         }
     }
+
+    /** Svuota la cache in memoria, forzando un refetch da rete alla prossima chiamata (usato dal pull-to-refresh). */
+    suspend fun clearCache() {
+        mutex.withLock { movieCache.clear() }
+    }
 }

@@ -32,6 +32,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,15 +87,19 @@ fun SerieScreen(uid: String, onShowClick: (Int) -> Unit, onEpisodeClick: (Episod
                 when (selectedTab) {
                     SerieTab.NOVITA -> NoviteGrid(
                         isLoading = state.isLoadingRecent,
+                        isRefreshing = state.isRefreshingRecent,
                         shows = state.recentShows,
                         errorMessage = state.recentErrorMessage,
+                        onRefresh = viewModel::refreshRecent,
                         onShowClick = onShowClick,
                     )
                     SerieTab.IN_ARRIVO -> UpcomingList(
                         isLoading = state.isLoadingUpcoming,
+                        isRefreshing = state.isRefreshingUpcoming,
                         isLoadingMore = state.isLoadingMoreUpcoming,
                         upcomingByDay = state.upcomingByDay,
                         errorMessage = state.upcomingErrorMessage,
+                        onRefresh = viewModel::refreshUpcomingManually,
                         onShowClick = onShowClick,
                         onEpisodeClick = onEpisodeClick,
                         onToggleWatched = viewModel::toggleEpisodeWatched,
@@ -105,14 +110,17 @@ fun SerieScreen(uid: String, onShowClick: (Int) -> Unit, onEpisodeClick: (Episod
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NoviteGrid(
     isLoading: Boolean,
+    isRefreshing: Boolean,
     shows: List<Show>,
     errorMessage: String?,
+    onRefresh: () -> Unit,
     onShowClick: (Int) -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         when {
             isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             errorMessage != null -> Text(
@@ -137,17 +145,20 @@ private fun NoviteGrid(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UpcomingList(
     isLoading: Boolean,
+    isRefreshing: Boolean,
     isLoadingMore: Boolean,
     upcomingByDay: List<Pair<Long, List<UpcomingEpisodeItem>>>,
     errorMessage: String?,
+    onRefresh: () -> Unit,
     onShowClick: (Int) -> Unit,
     onEpisodeClick: (Episode) -> Unit,
     onToggleWatched: (UpcomingEpisodeItem) -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         when {
             isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             errorMessage != null -> Text(

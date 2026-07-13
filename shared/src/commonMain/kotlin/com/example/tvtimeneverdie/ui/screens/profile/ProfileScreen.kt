@@ -25,6 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -114,7 +115,9 @@ fun ProfileScreen(
                 state.toWatchMovies.filter { it.title.contains(searchQuery, ignoreCase = true) }
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            val isRefreshing = if (selectedTab == MediaType.SERIES) state.isRefreshingSeries else state.isRefreshingMovies
+            val onRefresh = if (selectedTab == MediaType.SERIES) viewModel::refreshSeriesManually else viewModel::refreshMoviesManually
+            PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
                 when (selectedTab) {
                     MediaType.SERIES -> when {
                         state.isLoadingSeries -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

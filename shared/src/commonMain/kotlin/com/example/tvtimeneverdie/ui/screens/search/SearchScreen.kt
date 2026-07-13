@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -62,7 +63,11 @@ fun SearchScreen(onShowClick: (Int) -> Unit, onMovieClick: (Int) -> Unit) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    PullToRefreshBox(
+                        isRefreshing = state.isRefreshing,
+                        onRefresh = viewModel::refresh,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
                         val hasResults = if (state.mediaType == MediaType.SERIES) {
                             state.showResults.isNotEmpty()
                         } else {

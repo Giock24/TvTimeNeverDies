@@ -18,6 +18,7 @@ data class SearchUiState(
     val mediaType: MediaType = MediaType.SERIES,
     val query: String = "",
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val hasSearched: Boolean = false,
     val showResults: List<Show> = emptyList(),
     val movieResults: List<Movie> = emptyList(),
@@ -48,30 +49,50 @@ class SearchViewModel(
         }
     }
 
-    fun search() {
+    fun search() = runSearch(isRefresh = false)
+
+    /** Richiamata dal gesto di pull-to-refresh: ripete l'ultima ricerca eseguita. */
+    fun refresh() = runSearch(isRefresh = true)
+
+    private fun runSearch(isRefresh: Boolean) {
         val query = _uiState.value.query.trim()
         val mediaType = _uiState.value.mediaType
         if (query.isEmpty()) {
             _uiState.update {
-                it.copy(showResults = emptyList(), movieResults = emptyList(), hasSearched = false, errorMessage = null)
+                it.copy(
+                    showResults = emptyList(),
+                    movieResults = emptyList(),
+                    hasSearched = false,
+                    isRefreshing = false,
+                    errorMessage = null,
+                )
             }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update {
+                if (isRefresh) it.copy(isRefreshing = true, errorMessage = null)
+                else it.copy(isLoading = true, errorMessage = null)
+            }
             try {
                 when (mediaType) {
                     MediaType.SERIES -> {
                         val results = tvShowRepository.searchShows(query)
-                        _uiState.update { it.copy(isLoading = false, hasSearched = true, showResults = results) }
+                        _uiState.update {
+                            it.copy(isLoading = false, isRefreshing = false, hasSearched = true, showResults = results)
+                        }
                     }
                     MediaType.MOVIES -> {
                         val results = movieRepository.searchMovies(query)
-                        _uiState.update { it.copy(isLoading = false, hasSearched = true, movieResults = results) }
+                        _uiState.update {
+                            it.copy(isLoading = false, isRefreshing = false, hasSearched = true, movieResults = results)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Errore nella ricerca") }
+                _uiState.update {
+                    it.copy(isLoading = false, isRefreshing = false, errorMessage = e.message ?: "Errore nella ricerca")
+                }
             }
         }
     }

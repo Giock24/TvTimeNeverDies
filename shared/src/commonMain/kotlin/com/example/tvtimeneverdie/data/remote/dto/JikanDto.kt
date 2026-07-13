@@ -14,6 +14,7 @@ data class JikanAnimeDto(
     val score: Double? = null,
     val aired: JikanAiredDto? = null,
     val genres: List<JikanGenreDto> = emptyList(),
+    val episodes: Int? = null,
 )
 
 @Serializable

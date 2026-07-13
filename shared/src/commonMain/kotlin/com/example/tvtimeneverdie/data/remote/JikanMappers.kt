@@ -28,6 +28,7 @@ fun JikanAnimeDto.toDomain(): Show = Show(
     premiered = aired?.from?.take(10),
     rating = score,
     network = null,
+    episodeCount = episodes,
 )
 
 fun JikanEpisodeDto.toDomain(showMalId: Int): Episode = Episode(
@@ -37,6 +38,22 @@ fun JikanEpisodeDto.toDomain(showMalId: Int): Episode = Episode(
     number = malId,
     name = title,
     airdate = aired?.take(10),
+    imageUrl = null,
+    summary = "",
+)
+
+/**
+ * Episodio segnaposto usato quando Jikan conosce il numero totale di episodi (campo "episodes"
+ * della risposta anime) ma non ha i dati episodio-per-episodio: capita spesso per anime meno
+ * mainstream, dove il database community di MAL è incompleto pur avendo il conteggio totale.
+ */
+fun placeholderJikanEpisode(showMalId: Int, number: Int): Episode = Episode(
+    id = JIKAN_EPISODE_ID_OFFSET + showMalId * JIKAN_EPISODE_SHOW_MULTIPLIER + number,
+    showId = JIKAN_SHOW_ID_OFFSET + showMalId,
+    season = 1,
+    number = number,
+    name = "Episodio $number",
+    airdate = null,
     imageUrl = null,
     summary = "",
 )

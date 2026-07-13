@@ -10,4 +10,5 @@ data class Show(
     val premiered: String?,
     val rating: Double?,
     val network: String?,
+    val episodeCount: Int? = null,
 )

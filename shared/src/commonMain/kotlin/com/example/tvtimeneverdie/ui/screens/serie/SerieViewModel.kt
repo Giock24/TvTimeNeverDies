@@ -33,9 +33,11 @@ data class UpcomingEpisodeItem(
 
 data class SerieUiState(
     val isLoadingRecent: Boolean = true,
+    val isRefreshingRecent: Boolean = false,
     val recentShows: List<Show> = emptyList(),
     val recentErrorMessage: String? = null,
     val isLoadingUpcoming: Boolean = true,
+    val isRefreshingUpcoming: Boolean = false,
     val isLoadingMoreUpcoming: Boolean = false,
     val upcomingByDay: List<Pair<Long, List<UpcomingEpisodeItem>>> = emptyList(),
     val upcomingErrorMessage: String? = null,
@@ -50,6 +52,9 @@ class SerieViewModel(
     private val _uiState = MutableStateFlow(SerieUiState())
     val uiState: StateFlow<SerieUiState> = _uiState.asStateFlow()
 
+    private var latestWatchlistIds: Set<Int> = emptySet()
+    private var latestWatchedEntries: List<WatchedEpisodeEntry> = emptyList()
+
     init {
         loadRecentShows()
         viewModelScope.launch {
@@ -62,26 +67,62 @@ class SerieViewModel(
                         it.copy(isLoadingUpcoming = false, upcomingErrorMessage = e.message ?: "Errore Firestore")
                     }
                 }
-                .collect { (watchlistIds, watchedEntries) -> refreshUpcoming(watchlistIds, watchedEntries) }
+                .collect { (watchlistIds, watchedEntries) ->
+                    latestWatchlistIds = watchlistIds
+                    latestWatchedEntries = watchedEntries
+                    refreshUpcoming(watchlistIds, watchedEntries)
+                }
         }
     }
 
     private fun loadRecentShows() {
+        viewModelScope.launch { fetchRecentShows(isRefresh = false) }
+    }
+
+    /** Richiamata dal gesto di pull-to-refresh sulla tab "Novità". */
+    fun refreshRecent() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingRecent = true, recentErrorMessage = null) }
-            try {
-                val shows = tvShowRepository.getRecentShows()
-                _uiState.update { it.copy(isLoadingRecent = false, recentShows = shows) }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(isLoadingRecent = false, recentErrorMessage = e.message ?: "Errore nel caricamento")
-                }
+            tvShowRepository.clearCache()
+            fetchRecentShows(isRefresh = true)
+        }
+    }
+
+    private suspend fun fetchRecentShows(isRefresh: Boolean) {
+        _uiState.update {
+            if (isRefresh) it.copy(isRefreshingRecent = true, recentErrorMessage = null)
+            else it.copy(isLoadingRecent = true, recentErrorMessage = null)
+        }
+        try {
+            val shows = tvShowRepository.getRecentShows()
+            _uiState.update { it.copy(isLoadingRecent = false, isRefreshingRecent = false, recentShows = shows) }
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(
+                    isLoadingRecent = false,
+                    isRefreshingRecent = false,
+                    recentErrorMessage = e.message ?: "Errore nel caricamento",
+                )
             }
         }
     }
 
-    private suspend fun refreshUpcoming(watchlistIds: Set<Int>, watchedEntries: List<WatchedEpisodeEntry>) {
-        _uiState.update { it.copy(isLoadingUpcoming = true, isLoadingMoreUpcoming = false, upcomingErrorMessage = null) }
+    /** Richiamata dal gesto di pull-to-refresh sulla tab "In arrivo": forza un refetch di show/episodi. */
+    fun refreshUpcomingManually() {
+        viewModelScope.launch {
+            tvShowRepository.clearCache()
+            refreshUpcoming(latestWatchlistIds, latestWatchedEntries, isManualRefresh = true)
+        }
+    }
+
+    private suspend fun refreshUpcoming(
+        watchlistIds: Set<Int>,
+        watchedEntries: List<WatchedEpisodeEntry>,
+        isManualRefresh: Boolean = false,
+    ) {
+        _uiState.update {
+            if (isManualRefresh) it.copy(isRefreshingUpcoming = true, upcomingErrorMessage = null)
+            else it.copy(isLoadingUpcoming = true, isLoadingMoreUpcoming = false, upcomingErrorMessage = null)
+        }
         try {
             val watchedEpisodeIdsByShow = watchedEntries.groupBy { it.showId }
                 .mapValues { (_, entries) -> entries.map { it.episodeId }.toSet() }
@@ -90,7 +131,12 @@ class SerieViewModel(
 
             if (chunks.isEmpty()) {
                 _uiState.update {
-                    it.copy(isLoadingUpcoming = false, isLoadingMoreUpcoming = false, upcomingByDay = emptyList())
+                    it.copy(
+                        isLoadingUpcoming = false,
+                        isRefreshingUpcoming = false,
+                        isLoadingMoreUpcoming = false,
+                        upcomingByDay = emptyList(),
+                    )
                 }
                 return
             }
@@ -129,13 +175,19 @@ class SerieViewModel(
 
                 val hasMore = chunkIndex < chunks.lastIndex
                 _uiState.update {
-                    it.copy(isLoadingUpcoming = false, isLoadingMoreUpcoming = hasMore, upcomingByDay = grouped)
+                    it.copy(
+                        isLoadingUpcoming = false,
+                        isRefreshingUpcoming = false,
+                        isLoadingMoreUpcoming = hasMore,
+                        upcomingByDay = grouped,
+                    )
                 }
             }
         } catch (e: Exception) {
             _uiState.update {
                 it.copy(
                     isLoadingUpcoming = false,
+                    isRefreshingUpcoming = false,
                     isLoadingMoreUpcoming = false,
                     upcomingErrorMessage = e.message ?: "Errore nel caricamento",
                 )

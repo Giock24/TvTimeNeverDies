@@ -4,6 +4,7 @@ import com.example.tvtimeneverdie.data.remote.JIKAN_SHOW_ID_OFFSET
 import com.example.tvtimeneverdie.data.remote.JikanApi
 import com.example.tvtimeneverdie.data.remote.TvMazeApi
 import com.example.tvtimeneverdie.data.remote.isJikanShowId
+import com.example.tvtimeneverdie.data.remote.placeholderJikanEpisode
 import com.example.tvtimeneverdie.data.remote.toDomain
 import com.example.tvtimeneverdie.domain.model.Episode
 import com.example.tvtimeneverdie.domain.model.Show
@@ -38,12 +39,36 @@ class TvShowRepository(
         mutex.withLock { episodesCache[showId] }?.let { return it }
         val episodes = if (isJikanShowId(showId)) {
             val malId = showId - JIKAN_SHOW_ID_OFFSET
-            jikanApi.getEpisodes(malId).map { it.toDomain(malId) }
+            val fetched = jikanApi.getEpisodes(malId).map { it.toDomain(malId) }
+            fetched.ifEmpty { placeholderEpisodesFromTotalCount(showId, malId) }
         } else {
             api.getEpisodes(showId).map { it.toDomain(showId) }
         }
         mutex.withLock { episodesCache[showId] = episodes }
         return episodes
+    }
+
+    /**
+     * Jikan spesso conosce il numero totale di episodi di un anime (campo "episodes" della
+     * risposta anime) anche quando il database episodio-per-episodio (community MAL) è vuoto o
+     * incompleto: in quel caso generiamo episodi segnaposto numerati invece di mostrare una lista
+     * vuota (vedi episodi mancanti per anime poco mainstream come "Black Torch").
+     */
+    private suspend fun placeholderEpisodesFromTotalCount(showId: Int, malId: Int): List<Episode> {
+        val totalEpisodes = mutex.withLock { showCache[showId] }?.episodeCount
+            ?: runCatching { jikanApi.getAnime(malId).episodes }.getOrNull()
+        return totalEpisodes
+            ?.takeIf { it > 0 }
+            ?.let { count -> (1..count).map { placeholderJikanEpisode(malId, it) } }
+            ?: emptyList()
+    }
+
+    /** Svuota la cache in memoria, forzando un refetch da rete alla prossima chiamata (usato dal pull-to-refresh). */
+    suspend fun clearCache() {
+        mutex.withLock {
+            showCache.clear()
+            episodesCache.clear()
+        }
     }
 
     /** Cerca su TVmaze e su Jikan (fallback per gli anime, poco coperti da TVmaze) e unisce i risultati. */

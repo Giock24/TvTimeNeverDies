@@ -97,6 +97,16 @@ fun ShowDetailScreen(
                             onToggleWatchlist = viewModel::toggleWatchlist,
                         )
                     }
+                    if (state.episodesBySeason.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Nessun episodio disponibile per questa serie.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
                     state.episodesBySeason.forEach { (season, episodes) ->
                         item {
                             SeasonSection(

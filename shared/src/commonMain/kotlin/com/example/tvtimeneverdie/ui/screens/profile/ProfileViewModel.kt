@@ -29,6 +29,7 @@ private const val FETCH_CONCURRENCY = 6
 
 data class ProfileUiState(
     val isLoadingSeries: Boolean = true,
+    val isRefreshingSeries: Boolean = false,
     val isLoadingMoreSeries: Boolean = false,
     val email: String? = null,
     val displayName: String? = null,
@@ -37,6 +38,7 @@ data class ProfileUiState(
     val completed: List<ShowProgress> = emptyList(),
     val seriesErrorMessage: String? = null,
     val isLoadingMovies: Boolean = true,
+    val isRefreshingMovies: Boolean = false,
     val isLoadingMoreMovies: Boolean = false,
     val toWatchMovies: List<Movie> = emptyList(),
     val watchedMovies: List<Movie> = emptyList(),
@@ -62,6 +64,11 @@ class ProfileViewModel(
     private val _uiState = MutableStateFlow(ProfileUiState(email = email, displayName = displayName))
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
+    private var latestSeriesWatchlistIds: Set<Int> = emptySet()
+    private var latestSeriesWatchedEntries: List<WatchedEpisodeEntry> = emptyList()
+    private var latestMoviesWatchlistIds: Set<Int> = emptySet()
+    private var latestMoviesWatchedEntries: List<WatchedMovieEntry> = emptyList()
+
     init {
         viewModelScope.launch {
             combine(
@@ -73,7 +80,11 @@ class ProfileViewModel(
                         it.copy(isLoadingSeries = false, seriesErrorMessage = e.message ?: "Errore Firestore")
                     }
                 }
-                .collect { (watchlistIds, watchedEntries) -> refreshSeries(watchlistIds, watchedEntries) }
+                .collect { (watchlistIds, watchedEntries) ->
+                    latestSeriesWatchlistIds = watchlistIds
+                    latestSeriesWatchedEntries = watchedEntries
+                    refreshSeries(watchlistIds, watchedEntries)
+                }
         }
         viewModelScope.launch {
             combine(
@@ -85,12 +96,39 @@ class ProfileViewModel(
                         it.copy(isLoadingMovies = false, moviesErrorMessage = e.message ?: "Errore Firestore")
                     }
                 }
-                .collect { (watchlistIds, watchedEntries) -> refreshMovies(watchlistIds, watchedEntries) }
+                .collect { (watchlistIds, watchedEntries) ->
+                    latestMoviesWatchlistIds = watchlistIds
+                    latestMoviesWatchedEntries = watchedEntries
+                    refreshMovies(watchlistIds, watchedEntries)
+                }
         }
     }
 
-    private suspend fun refreshSeries(watchlistIds: Set<Int>, watchedEntries: List<WatchedEpisodeEntry>) {
-        _uiState.update { it.copy(isLoadingSeries = true, isLoadingMoreSeries = false, seriesErrorMessage = null) }
+    /** Richiamata dal gesto di pull-to-refresh sulla tab serie: forza un refetch di show/episodi. */
+    fun refreshSeriesManually() {
+        viewModelScope.launch {
+            tvShowRepository.clearCache()
+            refreshSeries(latestSeriesWatchlistIds, latestSeriesWatchedEntries, isManualRefresh = true)
+        }
+    }
+
+    /** Richiamata dal gesto di pull-to-refresh sulla tab film: forza un refetch dei film. */
+    fun refreshMoviesManually() {
+        viewModelScope.launch {
+            movieRepository.clearCache()
+            refreshMovies(latestMoviesWatchlistIds, latestMoviesWatchedEntries, isManualRefresh = true)
+        }
+    }
+
+    private suspend fun refreshSeries(
+        watchlistIds: Set<Int>,
+        watchedEntries: List<WatchedEpisodeEntry>,
+        isManualRefresh: Boolean = false,
+    ) {
+        _uiState.update {
+            if (isManualRefresh) it.copy(isRefreshingSeries = true, seriesErrorMessage = null)
+            else it.copy(isLoadingSeries = true, isLoadingMoreSeries = false, seriesErrorMessage = null)
+        }
         try {
             val watchedByShow = watchedEntries.groupBy { it.showId }
             val allShowIds = (watchlistIds + watchedByShow.keys).distinct()
@@ -98,7 +136,14 @@ class ProfileViewModel(
 
             if (chunks.isEmpty()) {
                 _uiState.update {
-                    it.copy(isLoadingSeries = false, isLoadingMoreSeries = false, toWatch = emptyList(), watching = emptyList(), completed = emptyList())
+                    it.copy(
+                        isLoadingSeries = false,
+                        isRefreshingSeries = false,
+                        isLoadingMoreSeries = false,
+                        toWatch = emptyList(),
+                        watching = emptyList(),
+                        completed = emptyList(),
+                    )
                 }
                 return
             }
@@ -148,6 +193,7 @@ class ProfileViewModel(
                 _uiState.update {
                     it.copy(
                         isLoadingSeries = false,
+                        isRefreshingSeries = false,
                         isLoadingMoreSeries = hasMore,
                         toWatch = toWatch.sortedByDescending { show -> show.premiered ?: "" },
                         watching = watching.sortedWith(
@@ -162,6 +208,7 @@ class ProfileViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingSeries = false,
+                    isRefreshingSeries = false,
                     isLoadingMoreSeries = false,
                     seriesErrorMessage = e.message ?: "Errore nel caricamento del profilo",
                 )
@@ -169,8 +216,15 @@ class ProfileViewModel(
         }
     }
 
-    private suspend fun refreshMovies(watchlistIds: Set<Int>, watchedEntries: List<WatchedMovieEntry>) {
-        _uiState.update { it.copy(isLoadingMovies = true, isLoadingMoreMovies = false, moviesErrorMessage = null) }
+    private suspend fun refreshMovies(
+        watchlistIds: Set<Int>,
+        watchedEntries: List<WatchedMovieEntry>,
+        isManualRefresh: Boolean = false,
+    ) {
+        _uiState.update {
+            if (isManualRefresh) it.copy(isRefreshingMovies = true, moviesErrorMessage = null)
+            else it.copy(isLoadingMovies = true, isLoadingMoreMovies = false, moviesErrorMessage = null)
+        }
         try {
             val watchedAtByMovieId = watchedEntries.associate { it.movieId to it.watchedAtMillis }
             val watchedIds = watchedAtByMovieId.keys
@@ -179,7 +233,13 @@ class ProfileViewModel(
 
             if (chunks.isEmpty()) {
                 _uiState.update {
-                    it.copy(isLoadingMovies = false, isLoadingMoreMovies = false, toWatchMovies = emptyList(), watchedMovies = emptyList())
+                    it.copy(
+                        isLoadingMovies = false,
+                        isRefreshingMovies = false,
+                        isLoadingMoreMovies = false,
+                        toWatchMovies = emptyList(),
+                        watchedMovies = emptyList(),
+                    )
                 }
                 return
             }
@@ -202,6 +262,7 @@ class ProfileViewModel(
                 _uiState.update {
                     it.copy(
                         isLoadingMovies = false,
+                        isRefreshingMovies = false,
                         isLoadingMoreMovies = hasMore,
                         toWatchMovies = toWatch.sortedByDescending { movie -> movie.releaseDate ?: "" },
                         watchedMovies = watched.sortedByDescending { movie -> watchedAtByMovieId[movie.id] ?: 0L },
@@ -212,6 +273,7 @@ class ProfileViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingMovies = false,
+                    isRefreshingMovies = false,
                     isLoadingMoreMovies = false,
                     moviesErrorMessage = e.message ?: "Errore nel caricamento dei film",
                 )

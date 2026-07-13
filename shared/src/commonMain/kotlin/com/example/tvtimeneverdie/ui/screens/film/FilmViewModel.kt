@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 data class FilmUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val movies: List<Movie> = emptyList(),
     val errorMessage: String? = null,
 )
@@ -29,13 +30,28 @@ class FilmViewModel(
     }
 
     fun loadMovies() {
+        viewModelScope.launch { fetchMovies(isRefresh = false) }
+    }
+
+    /** Richiamata dal gesto di pull-to-refresh: forza un refetch da rete invece di leggere la cache. */
+    fun refresh() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            try {
-                val movies = movieRepository.getNowPlaying()
-                _uiState.update { it.copy(isLoading = false, movies = movies) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Errore nel caricamento") }
+            movieRepository.clearCache()
+            fetchMovies(isRefresh = true)
+        }
+    }
+
+    private suspend fun fetchMovies(isRefresh: Boolean) {
+        _uiState.update {
+            if (isRefresh) it.copy(isRefreshing = true, errorMessage = null)
+            else it.copy(isLoading = true, errorMessage = null)
+        }
+        try {
+            val movies = movieRepository.getNowPlaying()
+            _uiState.update { it.copy(isLoading = false, isRefreshing = false, movies = movies) }
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(isLoading = false, isRefreshing = false, errorMessage = e.message ?: "Errore nel caricamento")
             }
         }
     }
